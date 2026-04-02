@@ -1,0 +1,8 @@
+pymupdf
+pdfplumber
+langgraph
+pydantic
+streamlit
+python-dotenv
+xai-sdk
+httpx
