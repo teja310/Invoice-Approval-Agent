@@ -1,57 +1,65 @@
-# Galatiq Case: Invoice Processing Automation
+# Invoice Processing Automation
 
-## Background
+## Project Overview
 
-Acme Corp is a PE-backed manufacturing firm losing **$2M/year** on manual invoice processing. Invoices arrive via email as PDFs in messy formats with frequent errors. Staff manually extract data, validate against a legacy inventory database (inconsistent), obtain VP approval (via email chains), and process payment (via a banking API).
+This system automates invoice handling with a multi-agent workflow.  
+It ingests invoice files, validates extracted data against a local inventory database, applies approval logic, and simulates payment.
 
-**Current pain points:**
-- 30% error rate
-- 5-day processing delays
-- Frustrated stakeholders
+## Problem Context
 
-## Objective
-
-Build a **multi-agent system** that automates the end-to-end invoice processing workflow. The system must run as a working prototype — not just designs or slides.
+Manual invoice workflows can be slow and error-prone, especially when files come in inconsistent formats.  
+This repository provides a local prototype for improving processing speed, consistency, and auditability.
 
 ## Workflow
 
-The system should handle four stages:
+The pipeline runs in four stages:
 
-1. **Ingestion** — Extract structured data from invoice documents (PDFs, text files). Fields include: Vendor, Amount, Items (with quantities), and Due Date. Expect unstructured text, typos, missing data, and potentially fraudulent entries.
+1. `Ingestion`  
+   Extract structured fields from invoices (PDF/TXT/CSV/JSON), including vendor, amount, due date, and line items.
 
-2. **Validation** — Verify extracted data against a mock inventory database (SQLite). Flag mismatches such as quantity exceeding available stock or items not found in inventory.
+2. `Validation`  
+   Validate extracted items and quantities against a SQLite inventory database.  
+   Flag unknown items, insufficient stock, and invalid values.
 
-3. **Approval** — Simulate VP-level review with rule-based decision-making (e.g., invoices over $10K require additional scrutiny). The agent should reason through approval/rejection with a reflection or critique loop.
+3. `Approval`  
+   Apply rule-based approval logic (for example, extra checks on higher-value invoices).
 
-4. **Payment** — If approved, call a mock payment function. If rejected, log the rejection with reasoning.
+4. `Payment`  
+   Simulate payment for approved invoices, or log rejection reasons for declined invoices.
 
-## Technical Requirements
+## Technical Approach
 
-- **LLM Integration**: Use xAI's Grok as the core reasoning engine (via the xAI API at https://grok.x.ai). Other models are acceptable if you don't have an API key.
-- **Multi-Agent Orchestration**: Use a framework such as LangGraph, CrewAI, AutoGen, or a custom solution.
-- **Agent Capabilities**: Function calling / tool use, structured outputs, and self-correction loops.
-- **Runtime**: Assume no internet for external APIs — simulate everything locally.
-- **Tech Stack**: Python (preferred), with libraries like `langchain`, `crewai`, `autogen`, `pdfplumber`, `PyMuPDF`, etc. Run locally — no cloud deployment.
+- `Language`: Python
+- `Architecture`: Multi-agent orchestration (framework-based or custom)
+- `LLM`: xAI Grok (or another compatible model)
+- `Execution`: Local runtime with mocked external dependencies
 
-## Provided Resources
+## Project Data
 
-### Mock Invoice Data
+Sample invoices are available in `data/invoices/` and include both clean and problematic cases for testing.
 
-Sample invoices are provided in the `data/invoices/` directory in various formats (PDF, CSV, JSON, TXT). Use these as inputs for testing. The data intentionally includes a mix of clean entries and problematic ones — identifying and handling issues is part of the challenge.
+## Requirements
 
-### Mock Inventory Database (Required Setup)
+- Python 3.10+
+- Dependencies listed in `requirements.txt`
 
-Before running the system, you **must** create a local SQLite database that the validation agent will check invoices against. The sample invoices in `data/invoices/` reference specific items and quantities — your database needs to contain matching inventory records so the validation stage can flag mismatches, out-of-stock items, and unknown products.
+Install dependencies:
 
-Below is a starter schema and seed data that covers the core items referenced across the provided invoices:
+```bash
+pip install -r requirements.txt
+```
+
+## Database Setup
+
+Create and seed the local SQLite database used during validation:
 
 ```python
 import sqlite3
 
-conn = sqlite3.connect('inventory.db')  # Persist to file so all agents can access it
+conn = sqlite3.connect("inventory.db")
 cursor = conn.cursor()
 
-cursor.execute('CREATE TABLE IF NOT EXISTS inventory (item TEXT PRIMARY KEY, stock INTEGER)')
+cursor.execute("CREATE TABLE IF NOT EXISTS inventory (item TEXT PRIMARY KEY, stock INTEGER)")
 cursor.execute("""
     INSERT INTO inventory VALUES
     ('WidgetA', 15),
@@ -60,21 +68,12 @@ cursor.execute("""
     ('FakeItem', 0)
 """)
 conn.commit()
+conn.close()
 ```
 
-**Why this matters:** The sample invoices are designed to test your validation logic against this database. For example:
+You can extend this schema with fields such as unit price, category, or vendor metadata if needed.
 
-| Scenario | Invoice | What should happen |
-|---|---|---|
-| Normal order within stock | INV-1001, INV-1004, INV-1006 | Items found, quantities valid — passes validation |
-| Quantity exceeds stock | INV-1002 (requests 20× GadgetX, only 5 in stock) | Flagged as stock mismatch |
-| Fraudulent / zero-stock item | INV-1003 (references FakeItem, 0 stock) | Flagged as out of stock or suspicious |
-| Item not in database at all | INV-1008 (SuperGizmo, MegaSprocket), INV-1016 (WidgetC) | Flagged as unknown item |
-| Invalid data | INV-1009 (negative quantity) | Flagged as data integrity issue |
-
-You may extend the seed data with additional items or columns (e.g., unit price, category) to support richer validation — the above is the minimum needed to exercise the provided test invoices. If you want your system to also validate pricing or vendor information, consider adding tables for those as well.
-
-### Mock Payment API
+## Mock Payment Function
 
 ```python
 def mock_payment(vendor, amount):
@@ -82,7 +81,7 @@ def mock_payment(vendor, amount):
     return {"status": "success"}
 ```
 
-### Grok API Setup
+## Grok API Example
 
 ```python
 from xai import Grok
@@ -94,22 +93,12 @@ response = client.chat.completions.create(
 )
 ```
 
-## Running the System
+## Execute
 
-The system should be executable from the command line:
+Run the processor for a specific invoice:
 
 ```bash
 python main.py --invoice_path=data/invoices/invoice1.txt
 ```
 
-Output should include structured logs and results.
-
-## Evaluation Criteria
-
-- **Functionality** — Does the system work end-to-end?
-- **Code Quality** — Clean, testable, well-structured code with error handling and observability
-- **Agentic Sophistication** — LLM integration, multi-agent flow, tool use, self-correction loops
-- **Shipping Mindset** — Valuable MVP delivered under ambiguity; scope ruthlessly cut where needed
-- **Presentation** — Clear translation of technical decisions to business impact
-- **Above/Beyond** - Have you made it your own? Implemented additional features that make the solution feel great? Expanded assumptions? Added to test cases?
-- **UI/UX** - Users will understand and enjoy using this system.
+The command outputs processing logs and the final status for the invoice.
